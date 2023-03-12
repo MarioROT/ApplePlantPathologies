@@ -90,3 +90,6 @@ target/
 
 # Neptune
 .neptune/
+
+# Models
+Checkpoints/
