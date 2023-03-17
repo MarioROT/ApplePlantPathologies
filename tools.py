@@ -540,8 +540,9 @@ class MLCDataset(torch.utils.data.Dataset):
     def __getitem__(self, item):
         label = torch.tensor(self.labels[item].astype(np.int32))
         img_path = os.path.join(self.imgs_path, self.img_names[item])
-        img = torch.Tensor(imread(img_path))
-        img = torch.moveaxis(img, -1, 0)
+        img = imread(img_path)
+        # img = torch.Tensor(imread(img_path))
+        # img = torch.moveaxis(img, -1, 0)
         # img = Image.open(img_path)
         if self.transforms is not None:
             img = self.transforms(img)

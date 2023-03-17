@@ -45,105 +45,32 @@ from neptune.types import File
 from torchsummary import summary
 from tools import TorchXRayVisionNorm
 import itertools as itl
+import time
 
-params = {'OWNER': 'rubsini', 
+params = {'OWNER': 'rubsini',
           'PROJECT': 'ApplePlantDiseases',
-          'PARTITION':'../Data/Splits/split1.json',
-          'IMGS_PATH':'../Data/train_images/', 
-          'SAVE_PATH': 'Checkpoints/', 
-          'SAVE_DIR':'Result_Tables_Archs', 
-          'EXP_TYPE':['Initial Test Exp' ,'General Board'],
-          'LOG_MODEL': True,  
-          'BACKBONE': 'resnet50', 
-          'MODEL_FREEZE': True, 
-          'I_WEIGHTS': False,
-          'BATCH_SIZE': 16, 
-          'LR': 1e-3, 
-          'EPOCHS': 50, 
+          'PARTITION':'Data/Splits/split1.json',
+          'IMGS_PATH':'Data/224/',
+          'SAVE_PATH': 'Checkpoints/',
+          'SAVE_DIR':'Result_Tables_Archs',
+          'EXP_TYPE':['Architectures2' ,'General Board'],
+          'LOG_MODEL': True,
+          'BACKBONE': 'resnet101',
+          'MODEL_FREEZE': False,
+          'I_WEIGHTS': True,
+          'BATCH_SIZE': 32,
+          'LR': 1e-3,
+          'EPOCHS': 50,
           'N_WORKERS': 1,
           'SAVE_FREQ': 50,
           'WEIGHT_DECAY': 5e-5,
-        #   'RESIZE': 224,
+          'RESIZE': 224,
           'CROP_SIZE': 512,
           'ROTATION_RANGE': 15,
           'TRANSLATION': 0.10,
           'SCALE': (0.85,1.15),
           "IMG_MEAN":[0.485, 0.456, 0.406],
           "IMG_STD":[0.229, 0.224, 0.225]
-          }
-
-import os
-import time
-import numpy as np
-import pandas as pd
-from torch.utils.data.dataset import Dataset
-from tqdm import tqdm
-from torchvision import transforms
-import torch.nn as nn
-from torchvision import models
-import torch
-from torch.utils.tensorboard import SummaryWriter
-from sklearn.metrics import precision_score, recall_score, f1_score
-from torch import nn
-from torch.utils.data.dataloader import DataLoader
-from matplotlib import pyplot as plt
-from numpy import printoptions
-import requests
-import tarfile
-import random
-import json
-from shutil import copyfile
-import pathlib
-
-from typing import List, Dict
-from multiprocessing import Pool
-from skimage.io import imread
-from PIL import Image
-
-import time
-import datetime
-
-from tools import get_transform, get_instance_segmentation_model, ObjectDetectionDataSet
-from tools import map_class_to_int, save_json, read_json, get_filenames_of_path, adapt_data
-from tools import checkpoint_save, show_sample, MutilabelClassificationDataset, evaluate
-from tools import MLCDataset
-from backbones import GetModel, GetModelNM, BuildModel
-from torchmets import sklearn_metrics, compute_full_metrics, compute_tracking_metrics
-import shutil
-import sys
-
-import re
-from math import isnan
-from os.path import isfile, join
-from neptune.new.types import File
-from torchsummary import summary
-from tools import TorchXRayVisionNorm
-
-params = {'OWNER': 'rubsini',  # Nombre de usuario en Neptune.ai
-          'PROJECT': 'Classification-New-Metrics-CDataset', # Nombre dle proyecto creado en Neptune.ai
-          'SAVE_PATH': 'Checkpoints/', # Donde Guardar los parametros del modelo entrenado
-          'SAVE_DIR':'Result_Tables_CompDS', #'Result_Tables_CompDS',
-          'EXP_TYPE':['NF_HIDDEN','Complete Dataset' ,'General Board'],
-          'LOG_MODEL': True,  # Si se cargará el modelo a neptune después del entrenamiento
-          'BACKBONE': 'densenet121-res224-pc', # Red usada para transferencia de aprendizaje
-          'MODEL_FREEZE': True, # Escoger si se congelan los pesos de las capas convolucionales del modelo
-          'I_WEIGHTS': False,
-          'BATCH_SIZE': 32, # Tamaño del lote
-          'LR': 1e-3, # Tasa de aprendizaje
-          'EPOCHS': 50, # Número máximo de épocas
-          'IOU_THRESHOLD': 0.5, # Umbral de Intersección sobre Union para evaluar predicciones en entrenamiento
-          'N_WORKERS': 8,
-          'WEIGHT_DECAY': 5e-5,
-          'OG_IMAGE_SIZE': '224',
-          'PARTITION_USED': 2,
-          'DATA_AUGMENTATION_METHOD':1,
-          'MODEL_BUILDING_METHOD':2,
-          'NF_HIDDEN':True,
-          'RESIZE': 224,
-          'CROP_SIZE': None,
-          'ROTATION_RANGE': 15,
-          'TRANSLATION': 10,
-          'SCALE': (0.85,1.15) # (tuple) - > (0.85, 1.15)
           }
 
 def main():
@@ -153,19 +80,19 @@ def main():
     train_transform = transforms.Compose([
                                         #   transforms.RandomCrop(params['CROP_SIZE']),
                                         # transforms.RandomAffine(params['ROTATION_RANGE'], translate=(params['TRANSLATION'], params['TRANSLATION']), scale=params['SCALE']),
-                                        transforms.Resize((params['CROP_SIZE'],params['CROP_SIZE'],)),
+                                        # transforms.Resize((params['CROP_SIZE'],params['CROP_SIZE'],)),
                                         # transforms.ToTensor(),
                                         # transforms.Normalize(params["IMG_MEAN"], params["IMG_STD"])
                                         ])
     val_transform = transforms.Compose([
-                                        transforms.Resize((params['CROP_SIZE'],params['CROP_SIZE'],)),
+                                        # transforms.Resize((params['CROP_SIZE'],params['CROP_SIZE'],)),
                                         # transforms.ToTensor(),
                                         # transforms.Normalize(params["IMG_MEAN"], params["IMG_STD"])
                                         ])
-
+    print(params)
     train_dataset = MLCDataset(params['PARTITION'], params['IMGS_PATH'], 'Train', train_transform)
-    val_dataset = MLCDataset(params['PARTITION'], params['IMGS_PATH'], 'Val', train_transform)
-    test_dataset = MLCDataset(params['PARTITION'], params['IMGS_PATH'], 'Test', train_transform)
+    val_dataset = MLCDataset(params['PARTITION'], params['IMGS_PATH'], 'Val', val_transform)
+    test_dataset = MLCDataset(params['PARTITION'], params['IMGS_PATH'], 'Test', val_transform)
 
     lt = len(train_dataset)+len(val_dataset)+len(test_dataset)
     ltr,ptr,lvd,pvd,lts,pts = len(train_dataset), len(train_dataset)/lt, len(val_dataset), len(val_dataset)/lt, len(test_dataset), len(test_dataset)/lt
@@ -174,7 +101,10 @@ def main():
     train_dataloader = DataLoader(train_dataset, batch_size=params['BATCH_SIZE'], num_workers=params["N_WORKERS"], shuffle=True, drop_last=True)
     val_dataloader = DataLoader(val_dataset, batch_size=params['BATCH_SIZE'], num_workers=params["N_WORKERS"])
     test_dataloader = DataLoader(test_dataset, batch_size=params['BATCH_SIZE'], num_workers=params["N_WORKERS"])
-
+    #init =  time.time()
+    #next(iter(train_dataloader))
+    #print(time.time() - init)
+    #sys.exit()
     test_freq = int(len(train_dataset)/params['BATCH_SIZE'])
 
     num_train_batches = int(np.ceil(len(train_dataset) / params['BATCH_SIZE']))
@@ -199,7 +129,7 @@ def main():
     # Logging metadata
     import neptune
     # from neptune.new.types import File  
-    NEPTUNE_API_TOKEN = 'Insert KEY Here'
+    NEPTUNE_API_TOKEN = 'eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiJlMjQ1NGZkNS00MmJhLTQwYWYtYjEyYi02ZTFjY2JkN2Q2YzMifQ=='
     run = neptune.init_run(project=f'{params["OWNER"]}/{params["PROJECT"]}',
                         api_token=NEPTUNE_API_TOKEN,
                         tags = params['EXP_TYPE'])
@@ -281,14 +211,14 @@ def main():
                                                 result['macro/f1'],
                                                 result['samples/f1'],
                                                 uap))
-        if best_macro_F1 < res_macro_F1 or epoch % save_freq == 0:
+        if best_macro_F1 < res_macro_F1 or epoch % params['SAVE_FREQ'] == 0:
             if best_macro_F1 <= res_macro_F1:
                 best_macro_F1 = res_macro_F1
                 s_model, s_epoch = model, epoch
-        if epoch % save_freq == 0:
-            checkpoint_save(s_model, save_path, s_epoch, run)
+        if epoch % params['SAVE_FREQ'] == 0:
+            checkpoint_save(s_model, params['SAVE_PATH'], s_epoch, run)
         epoch += 1
-        if max_epoch_number < epoch:
+        if params['EPOCHS'] < epoch:
             break
 
     #params["EXP_TYPE"][0] = params["EXP_TYPE"][1]+"/"+params["EXP_TYPE"][0]
